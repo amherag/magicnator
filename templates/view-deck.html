@@ -1,0 +1,46 @@
+{% extends "layouts/default.html" %}
+{% block title %}MTG{% endblock %}
+{% block head-scripts %}{% endblock %}
+{% block head-styles %}
+<link rel="stylesheet" type="text/css" media="screen" href="/css/main.css">
+{% endblock %}
+{% block content %}
+<div id="main">
+    <div>
+	Life: {{ life }}
+    </div>
+
+    <div id="hand">
+	{% for card in hand %}
+	<img src="{{ card.image.png }}" alt="{{ card.name }}" height="300px;" />
+	{% endfor %}
+    </div>
+    
+    {% for card in lands %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+    
+    {% for card in creatures %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+    
+    {% for card in artifacts %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+
+    {% for card in planeswalkers %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+
+    {% for card in graveyard %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+
+    {% for card in exiled %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+
+    <div id="card-viewer">
+    </div>
+</div>
+{% endblock %}

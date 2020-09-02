@@ -1,0 +1,75 @@
+{% extends "layouts/default.html" %}
+{% block title %}MTG{% endblock %}
+{% block head-styles %}
+<link rel="stylesheet" type="text/css" media="screen" href="https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.2/dragula.css">
+<link rel="stylesheet" type="text/css" media="screen" href="/css/play.css">
+{% endblock %}
+{% block head-scripts %}
+{% endblock %}
+{% block content %}
+<div id="main">
+    <div>
+    </div>
+    
+    <div id="life">
+	Life: {{ life }}
+    </div>
+
+    <div id="hand-table">
+	<div id="hand-outer-cell">
+	    <div class="description">HAND</div>
+	    <div id="hand-block">
+		{% for card in hand %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="clickCard(event)" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
+
+    <div id="lands-table">
+	<div id="lands-outer-cell">
+	    <div id="lands-block">
+		{% for card in lands %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
+
+    <div id="creatures-table">
+	<div id="creatures-outer-cell">
+	    <div id="creatures-block">
+		{% for card in creatures %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
+
+    <div id="artifacts-table">
+	<div id="artifacts-outer-cell">
+	    <div id="artifacts-block">
+		{% for card in artifacts %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
+
+    <div id="planeswalkers-table">
+	<div id="planeswalkers-outer-cell">
+	    <div id="planeswalkers-block">
+		{% for card in planeswalkers %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
+
+    {% for card in graveyard %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+
+    {% for card in exiled %}
+    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
+    {% endfor %}
+
+    <div id="card-viewer">
+    </div>
+</div>
+{% endblock %}
+{% block body-scripts %}
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.2/dragula.min.js'></script>
+<script src="js/play.js"></script>
+{% endblock %}

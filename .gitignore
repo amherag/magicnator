@@ -47,3 +47,12 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
+
+# Card images
+static/img/cards
+
+# Emacs backup files
+*~
+
+# Saved games
+saved-games/

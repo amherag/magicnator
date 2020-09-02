@@ -1,0 +1,111 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+/* Background colors */
+#hand-table {
+    background-color: #450099;
+}
+#lands-table {
+    background-color: #123;
+}
+#creatures-table {
+    background-color: #321;
+}
+#artifacts-table {
+    background-color: #555;
+}
+#planeswalkers-table {
+    background-color: #84ff31;
+}
+
+/* Positioning */
+#hand-table {
+    position: absolute;
+    bottom: 0;
+}
+#lands-table {
+    position: absolute;
+    bottom: 200px;
+}
+#artifacts-table {
+    position: absolute;
+    bottom: 200px;
+    left: 50%;
+}
+#creatures-table {
+    position: absolute;
+    bottom: 400px;
+}
+#planeswalkers-table {
+    position: absolute;
+    bottom: 400px;
+    left: 80%;
+}
+#hand-table, #lands-table, #creatures-table, #artifacts-table, #planeswalkers-table {
+    height: 200px;
+    width: 100%;
+    display: table;
+}
+#creatures-table {
+    width: 80%;
+}
+#planeswalkers-table {
+    width: 20%;
+}
+#lands-table {
+    width: 50%;
+}
+#artifacts-table {
+    width: 50%;
+}
+#hand-outer-cell, #lands-outer-cell, #creatures-outer-cell, #artifacts-outer-cell, #planeswalkers-outer-cell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    vertical-align: middle;
+    display: table-cell;
+    text-align: center;
+}
+#hand-block, #lands-block, #creatures-block, #artifacts-block, #planeswalkers-block {
+    min-width: 100px;
+    height: 200px;
+    vertical-align: middle;
+    display: inline-block;
+    text-align: center;
+    background-color: #999;
+}
+.card {
+    vertical-align: middle;
+    padding: 10px;
+    display: table-cell;
+}
+
+.card img {
+    max-width: 100%;
+    max-height: 150px;
+}
+
+.flip {
+    transform: rotate(45deg);
+}
+
+/* .go-under, .go-over {
+   position: relative;
+   left: 100px;
+   }
+
+   .card img {
+   position: relative;
+   z-index: 2;
+   }
+
+   .go-under img {
+   position: relative;
+   z-index: 1
+   } */
+
+.go-over img {
+    position: relative;
+    z-index: 3
+}
