@@ -8,7 +8,7 @@
 {% block content %}
 <div id="main">
     <div id="deck">
-	{% for card in deck %}
+	{% for card in collection %}
 	<div class="card">
 	    <img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" />
 	    <span class="quantity">{{ card.quantity }}</span>

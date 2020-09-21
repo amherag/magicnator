@@ -1,6 +1,6 @@
 (in-package :cl-user)
 (defpackage mtg.config
-  (:use :cl)
+  (:use :cl :postmodern)
   (:import-from :envy
                 :config-env-var
                 :defconfig)
@@ -12,7 +12,7 @@
            :appenv
            :developmentp
            :productionp
-	   :with-postgres-connection
+	   :conn
 	   ))
 (in-package :mtg.config)
 
@@ -27,12 +27,11 @@
 ;; For postgres.
 (defparameter *db-name* "mtg")
 (defparameter *db-user* "amherag")
-(defparameter *db-pass* "")
+(defparameter *db-pass* "asafrade")
+(defparameter *db-hostname* "localhost")
 
-(defmacro with-postgres-connection (&rest body)
-  (when datafly:*connection*
-    (datafly:disconnect-toplevel))
-  `(let ((datafly:*connection* (datafly:connect-cached :postgres :database-name ,*db-name* :username ,*db-user* :password ,*db-pass*)))
+(defmacro conn (&rest body)
+  `(with-connection (list ,*db-name* ,*db-user* ,*db-pass* ,*db-hostname*)
      ,@body))
 
 (defconfig :common

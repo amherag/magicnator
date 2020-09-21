@@ -1,6 +1,6 @@
 (in-package :cl-user)
 (defpackage mtg.view
-  (:use :cl)
+  (:use :cl :access)
   (:import-from :mtg.config
                 :*template-directory*)
   (:import-from :caveman2
@@ -36,7 +36,15 @@
   (encode-json object))
 
 (defun get-cards (fn)
-  (let* ((card-names (funcall fn))
+  (let* ((cards (funcall fn))
+	 (card-names (if (listp (first cards))
+			 (if (access (first cards) :name)
+			     (loop for card in cards collect (access card :name))
+			     (mapcar #'car cards))
+			 cards))
+	 (card-quantities (if (and (listp (first cards)) (access (first cards) :quantity))
+			      (loop for card in cards collect (access card :quantity))
+			      (make-list (length cards) :initial-element 1)))
 	 (small-images (mtg.controller:get-cards-image-pathspec card-names :small))
 	 (normal-images (mtg.controller:get-cards-image-pathspec card-names :normal))
 	 (large-images (mtg.controller:get-cards-image-pathspec card-names :large))
@@ -46,13 +54,14 @@
        for normal in normal-images
        for large in large-images
        for png in png-images
+       for quantity in card-quantities
        collect `((:name . ,name)
+		 (:quantity . ,quantity)
 		 (:image (:small . ,small)
 			 (:normal . ,normal)
 			 (:large . ,large)
 			 (:png . ,png))))))
 ;; (get-cards #'mtg.controller:get-hand)
-
 
 ;;
 ;; Execute package definition

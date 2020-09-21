@@ -1,43 +1,46 @@
 (in-package :cl-user)
 (defpackage mtg.utilities
-  (:use :cl :sxql :datafly :mtg.config)
+  (:use :cl :mtg.config :postmodern)
   (:export :init-database :read-file :write-file))
 (in-package :mtg.utilities)
 
 (defun init-database ()
   "Creates all the necessary tables for MTG."
-  (with-postgres-connection
-      (execute (create-table (:cards :if-not-exists t)
-		   ((id :type '(:varchar 36)
-			:primary-key t)
-		    (name :type '(:varchar 64))
-		    (json :type :text))))
-
-    (execute (create-table (:users :if-not-exists t)
-		 ((id :type '(:varchar 36)
-		      :primary-key t)
-		  (name :type '(:varchar 64))
-		  (password :type '(:varchar 64)))))
-    
-    (execute (create-table (:collection :if-not-exists t)
-		 ((id :type '(:varchar 36)
-		      :primary-key t)
-		  (user-id :type '(:varchar 36))
-		  (quantity :type 'integer
-			    :not-null t)
-		  (used :type 'integer
-			:not-null t))))
-    (execute (create-table (:decks :if-not-exists t)
-		 ((id :type '(:varchar 36)
-		      :primary-key t)
-		  (name :type '(:varchar 64)))))
-    (execute (create-table (:collection-decks :if-not-exists t)
-		 ((deck-id :type '(:varchar 36)
-			   :not-null t)
-		  (card-id :type '(:varchar 36)
-			   :not-null t)
-		  (quantity :type 'integer
-			    :not-null t))))))
+  (conn
+   (unless (table-exists-p 'cards)
+     (query (:create-table 'cards
+			   ((id :type string)
+			    (name :type string)
+			    (json :type string)
+			    (oracle-text :type string)
+			    (power :type string)
+			    (toughness :type string)
+			    (colors :type string[])
+			    (cmc :type float)
+			    ;; (mana-cost :type string[])
+			    (type-line :type string)
+			    (keywords :type string[])
+			    (set :type string)
+			    (set-name :type string)
+			    (rarity :type string)
+			    (flavor-text :type string)
+			    (price :type float))
+			   (:primary-key id)))
+     (query (:create-table 'collection
+			   ((id :type string)
+			    (user-id :type string)
+			    (quantity :type integer)
+			    (used :type integer))
+			   (:primary-key id)))
+     (query (:create-table 'decks
+			   ((id :type string)
+			    (name :type string))
+			   (:primary-key id)))
+     (query (:create-table 'collection-decks
+			   ((deck-id :type string)
+			    (card-id :type string)
+			    (quantity :type integer))
+			   (:primary-key id))))))
 ;; (init-database)
 
 (defun read-file (infile)

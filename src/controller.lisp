@@ -2,9 +2,12 @@
 ;; (mtg:start :port 2001)
 (in-package :cl-user)
 (defpackage mtg.controller
-  (:use :cl :mtg.config :sxql :datafly :alexandria :access :mtg.utilities :trivial-download)
+  (:use :cl :mtg.config :postmodern :alexandria :access :mtg.utilities :trivial-download)
   (:export
    :get-deck-card-names
+   :get-collection-card-names
+   :get-collection
+   :get-deck-cards-names-and-quantities
    :get-cards-image-pathspec
    
    :get-hand
@@ -24,24 +27,17 @@
 ;; (scryfall-uri "/cards/named" `(("exact" . "Shock")
 ;; 			       ("exact" . "Shock")))
 
-;; (with-postgres-connection (retrieve-one (select :*
-;; 					  (from :cards)
-;; 					  (where (:= :name (string-upcase "Shock"))))))
-
 (defun get-db-card-by-name (name)
-  (access (with-postgres-connection
-	      (retrieve-one (select :json
-			      (from :cards)
-			      (where (:= :name (string-upcase name))))))
+  (access (conn (query (:select 'json :from 'cards :where (:= 'name (string-upcase name)))
+		       :alist))
 	  :json))
 ;; (json:decode-json-from-string (get-db-card-by-name "Forest"))
 
 (defun get-db-card-by-id (id)
-  (access (with-postgres-connection
-	      (retrieve-one (select :json
-			      (from :cards)
-			      (where (:= :id id)))))
+  (access (conn (query (:select 'json :from 'cards :where (:= 'id id))
+		       :alist))
 	  :json))
+;; (get-db-card-by-id "7ef83f4c-d3ff-4905-a16d-f2bae673a5b2")
 
 (defun get-scryfall-card-by-name (name)
   ;; Being a good citizen.
@@ -52,25 +48,37 @@
 (defun insert-card-to-db (json)
   (let* ((json-object (json:decode-json-from-string json))
 	 (id (access json-object :id))
-	 (name (string-upcase (access json-object :name))))
+	 (name (string-upcase (access json-object :name)))
+	 (oracle-text (access json-object :oracle--text))
+	 (power (access json-object :power))
+	 (toughness (access json-object :toughness))
+	 (colors (apply #'vector (access json-object :colors)))
+	 (cmc (access json-object :cmc))
+	 (type-line (access json-object :type--line))
+	 (keywords (apply #'vector (access json-object :keywords)))
+	 (set (access json-object :set))
+	 (set-name (access json-object :set-name))
+	 (rarity (access json-object :rarity))
+	 (flavor-text (access json-object :flavor--text))
+	 (price (let ((price (accesses json-object :prices :usd))) (if price (read-from-string price) 0.0))))
     ;; Maybe the card was not recognized by name,
     ;; but we already have it if we search by id.
     (unless (get-db-card-by-id id)
-      (with-postgres-connection
-	  (execute (insert-into :cards
-		     (set= :id id
-			   :name name
-			   :json json)))))))
+      (conn (query (:insert-into 'cards :set
+				 'id id
+				 'name name
+				 'json json
+				 ))))))
 
 (defun drop-all-cards ()
-  (with-postgres-connection (execute (delete-from :cards))))
+  (conn (query (:delete-from 'cards))))
 ;; (drop-all-cards)
+
 (defun drop-everything ()
-  (with-postgres-connection
-      (execute (delete-from :cards))
-    (execute (delete-from :collection))
-    (execute (delete-from :decks))
-    (execute (delete-from :collection-decks))))
+  (conn (query (:delete-from 'cards))
+	(query (:delete-from 'collection))
+	(query (:delete-from 'decks))
+	(query (:delete-from 'collection-decks))))
 ;; (drop-everything)
 
 ;; (insert-card-to-db (get-scryfall-card-by-name "Shock"))
@@ -107,6 +115,66 @@
     json))
 ;; (length "59fa8e8d-bcb8-47bf-b71a-df11c8d0f2c9")
 
+(defun get-cards-with-keywords (keywords &optional (all-or-any? :any))
+  (let ((keywords (if (listp keywords) (apply #'vector keywords) keywords)))
+    (conn (if (eq all-or-any? :any)
+	      (query (:select '* :from 'cards :where (:&& 'keywords (:array[] keywords))) :alists)
+	      (query (:select '* :from 'cards :where (:@> 'keywords (:array[] keywords))) :alists)))))
+;; (get-cards-with-keywords '("Flash"))
+
+(defun get-collection-card-ids ()
+  (conn (query (:select 'id :from 'collection) :column)))
+;; (get-collection-card-ids)
+
+(defun get-cards-with-keywords-from-collection (keywords &optional (all-or-any? :any))
+  (let ((keywords (if (listp keywords) (apply #'vector keywords) keywords)))
+    (conn (if (eq all-or-any? :any)
+	      (query (:select '* :from 'cards :where
+			      (:and (:&& 'keywords (:array[] keywords)) ;; can have any
+				    (:in 'id (:set (get-collection-card-ids))))) :alists)
+	      (query (:select '* :from 'cards :where
+			      (:and (:@> 'keywords (:array[] keywords)) ;; must have all
+				    (:in 'id (:set (get-collection-card-ids))))) :alists)))))
+
+(defun get-cards-with-type-from-collection (type)
+  (conn (query (:select '* :from 'cards :where
+			(:and (:like 'type-line (format nil "%~a%" type)) ;; can have any
+			      (:in 'id (:set (get-collection-card-ids))))) :alists)))
+
+;; (get-cards-with-type-from-collection "Knight")
+
+
+(defun get-collection (&key keywords type (all-or-any? :any))
+  (let ((keywords (if (listp keywords) (apply #'vector keywords) keywords)))
+    (conn (query (:select '* :from 'cards
+			  :where
+			  (:and (:or
+				 (:like 'type-line (format nil "%~a%" type))
+				 ;; (:@> 'keywords (:array[] keywords))
+				 (:&& 'keywords (:array[] keywords))) ;; can have any
+				(:in 'id (:set (get-collection-card-ids))))) :alists))))
+
+(defun get-collection (&key keywords type (all-or-any? :any))
+  (let ((keywords (if (listp keywords) (apply #'vector keywords) keywords)))
+    (conn (query (:select '* (:as (:- 'collection.quantity 'collection.used) :quantity) :from 'cards
+			  :inner-join 'collection
+			  :on (:= 'cards.id 'collection.id)
+			  :where
+			  (:or
+			   (:like 'type-line (format nil "%~a%" type))
+			   ;; (:@> 'keywords (:array[] keywords))
+			   (:&& 'keywords (:array[] keywords))) ;; can have any
+			  ) :alists))))
+
+;; (get-collection '("Flash") "Knight")
+;; (get-collection nil "Knight")
+
+;; (get-collection)
+;; (get-collection :keywords '("Flash"))
+
+;; (loop for card in (get-cards-with-keywords-from-collection '("Flying" "Flash") :any)
+;;    do (format t "~a~%" (access card :name)))
+
 (defun get-card-mana-cost (name)
   (let ((card (json:decode-json-from-string (get-card name))))
     (access card :mana--cost)))
@@ -115,28 +183,17 @@
   (access (json:decode-json-from-string (get-db-card-by-id id)) :name))
 
 (defun check-card-in-collection-by-id (id)
-  (access (with-postgres-connection
-	      (retrieve-one (select :quantity
-			      (from :collection)
-			      (where (:= :id id)))))
-	  :quantity))
+  (access (conn (query (:select 'quantity :from 'collection :where (:= 'id id)) :alist)) :quantity))
 
 (defun increase-card-in-collection-by-id (id)
-  (with-postgres-connection
-      (execute (update :collection
-		 (set= :quantity (:+ :quantity 1))
-		 (where (:= :id id))))))
+  (conn (query (:update 'collection :set 'quantity (:+ 'quantity 1) :where (:= 'id id)))))
 
 (defun add-card-to-collection (name)
   (let* ((card (json:decode-json-from-string (get-card name)))
 	 (id (access card :id)))
     (if (check-card-in-collection-by-id id)
 	(increase-card-in-collection-by-id id)
-	(with-postgres-connection
-	    (execute (insert-into :collection
-		       (set= :id id
-			     :quantity 1
-			     :used 0)))))))
+	(conn (query (:insert-into 'collection :set 'id id 'quantity 1 'used 0))))))
 
 (defun get-quantity-card-on-collection (name)
   (access (get-card-from-collection name) :quantity))
@@ -167,10 +224,7 @@
       (error "You don't have this card."))
     (when (>= used quantity)
       (error "You don't have more copies of this card."))
-    (with-postgres-connection
-	(execute (update :collection
-		   (set= :used (:+ :used count))
-		   (where (:= :id id)))))))
+    (conn (query (:update 'collection :set 'used (:+ 'used count) :where (:= 'id id))))))
 
 (defun decrease-used-card-on-collection (name &optional (count 1))
   (let* ((card (json:decode-json-from-string (get-card name)))
@@ -178,41 +232,27 @@
 	 (used (get-used-card-on-collection name)))
     (if (check-card-in-collection-by-id id)
 	(when (and used (> used 0))
-	    (with-postgres-connection
-		(execute (update :collection
-			   (set= :used (:- :used count))
-			   (where (:= :id id))))))
-	(error "You don't have this card.")
-	)))
+	  (conn (query (:update 'collection :set 'used (:- 'used count) :where (:= 'id id)))))
+	(error "You don't have this card."))))
 
 (defun remove-card-from-collection (name)
   (let* ((card (json:decode-json-from-string (get-card name)))
 	 (id (access card :id))
 	 (quantity (check-card-in-collection-by-id id)))
-    (with-postgres-connection
-	(if (and quantity (> quantity 1))
-	    (execute (update :collection
-		       (set= :quantity (:- :quantity 1))
-		       (where (:= :id id))))
-	    (execute (delete-from :collection
-		       (where (:= :id id))))))))
+    (conn (if (and quantity (> quantity 1))
+	      (query (:update 'collection :set 'quantity (:- 'quantity 1) :where (:= 'id id)))
+	      (query (:delete-from 'collection :where (:= 'id id)))))))
 
 (defun get-deck (name)
   (let ((name (string-upcase name)))
-    (with-postgres-connection
-	(retrieve-one (select :*
-			(from :decks)
-			(where (:= :name name)))))))
+    (conn (query (:select '* :from 'decks :where (:= 'name name)) :alist))))
 
 (defun remove-deck (name)
   (let* ((deck-name (string-upcase name))
 	 (deck (get-deck deck-name))
 	 (deck-id (access deck :id))
 	 (cards (when deck-id
-		  (with-postgres-connection
-		      (retrieve-all (select :*
-				      (from :collection-decks)
-				      (where (:= :deck-id deck-id)))))))
+		  (conn (query (:select '* :from 'collection-decks :where (:= 'deck-id deck-id)) :alists))))
 	 (cards-ids (loop for card in cards collect (access card :card-id)))
 	 (cards-names (when cards-ids
 			(loop for id in cards-ids collect (get-card-name-by-id id))))
@@ -222,25 +262,17 @@
       (loop for name in cards-names
     	 for quantity in cards-quantities
     	 do (decrease-used-card-on-collection name quantity)))
-    
     (when deck-id
-      (with-postgres-connection
-	  ;; Removing relationship between deck and collection cards.
-	  (execute (delete-from :collection-decks
-		     (where (:= :deck-id deck-id))))))
+      ;; Removing relationship between deck and collection cards.
+      (conn (query (:delete-from 'collection-decks :where (:= 'deck-id deck-id)))))
     ;; Removing deck.
     (when deck-id
-      (with-postgres-connection
-	  (execute (delete-from :decks
-		     (where (:= :name deck-name))))))
-    ))
+      (conn (query (:delete-from 'decks :where (:= 'name deck-name)))))))
 ;; (remove-deck "Ashiok")
 
 (defun list-decks ()
   (loop for i from 1
-     for deck in (with-postgres-connection
-		     (retrieve-all (select :name
-				     (from :decks))))
+     for deck in (conn (query (:select 'name :from 'decks) :alists))
      do (format t "~a. ~a~%" i (access deck :name))))
 
 ;; (list-decks)
@@ -253,19 +285,14 @@
 (defun create-deck (name)
   (let ((name (string-upcase name)))
     (unless (get-deck name)
-      (with-postgres-connection
-	  (execute (insert-into :decks
-		     (set= :id (format nil "~a" (uuid:make-v4-uuid))
-			   :name name)))))))
+      (conn (query (:insert-into 'decks :set 'id (format nil "~a" (uuid:make-v4-uuid)) 'name name))))))
 
 (defun deck-has-card? (card-name deck-name)
   (let ((card (json:decode-json-from-string (get-card card-name)))
 	(deck (get-deck deck-name)))
-    (access (with-postgres-connection
-		(retrieve-one (select :*
-				(from :collection-decks)
-				(where (:and (:= :deck-id (access deck :id))
-					     (:= :card-id (access card :id)))))))
+    (access (conn (query (:select '* :from 'collection-decks :where (:and (:= 'deck-id (access deck :id))
+									  (:= 'card-id (access card :id))))
+			 :alist))
 	    :quantity)))
 
 (defun add-card-to-deck (card-name deck-name)
@@ -273,31 +300,26 @@
 	(deck (get-deck deck-name)))
     (increase-used-card-on-collection card-name)
     (if (deck-has-card? card-name deck-name)
-	(with-postgres-connection
-	    (execute (update :collection-decks
-		       (set= :quantity (:+ :quantity 1))
-		       (where (:and (:= :deck-id (access deck :id))
-				    (:= :card-id (access card :id)))))))
-	(with-postgres-connection
-	    (execute (insert-into :collection-decks
-		       (set= :deck-id (access deck :id)
-			     :card-id (access card :id)
-			     :quantity 1)))))))
+	(conn (query (:update 'collection-decks :set 'quantity (:+ 'quantity 1)
+			      :where (:and (:= 'deck-id (access deck :id))
+					   (:= 'card-id (access card :id))))))
+	(conn (query (:insert-into 'collection-decks :set
+				   'deck-id (access deck :id)
+				   'card-id (access card :id)
+				   'quantity 1))))))
 
 (defun remove-card-from-deck (card-name deck-name)
   (let ((card (json:decode-json-from-string (get-card card-name)))
 	(deck (get-deck deck-name)))
     (decrease-used-card-on-collection card-name)
-    (with-postgres-connection
-	(when-let ((quantity (deck-has-card? card-name deck-name)))
-	  (if (and quantity (> quantity 1))
-	      (execute (update :collection-decks
-			 (set= :quantity (:- :quantity 1))
-			 (where (:and (:= :deck-id (access deck :id))
-				      (:= :card-id (access card :id))))))
-	      (execute (delete-from :collection-decks
-			 (where (:and (:= :deck-id (access deck :id))
-				      (:= :card-id (access card :id)))))))))))
+    (when-let ((quantity (deck-has-card? card-name deck-name)))
+      (if (and quantity (> quantity 1))
+	  (conn (query (:update 'collection-decks :set 'quantity (:- 'quantity 1) :where
+				(:and (:= 'deck-id (access deck :id))
+				      (:= 'card-id (access card :id))))))
+	  (conn (query (:delete-from 'collection-decks :where
+				(:and (:= 'deck-id (access deck :id))
+				      (:= 'card-id (access card :id))))))))))
 
 (defun describe-deck (name)
   (let* ((deck (get-deck name))
@@ -306,15 +328,31 @@
 	 (cards-ids (loop for card in cards collect (access card :card-id)))
 	 (cards-quantities (loop for card in cards collect (access card :quantity)))
 	 (cards-names (when cards-ids
-			(loop for id in cards-ids collect (get-card-name-by-id id))))
-	 )
+			(loop for id in cards-ids collect (get-card-name-by-id id)))))
     (when (and deck-id cards-names cards-quantities)
       (format t "Deck Name: ~a~%~%" name)
       (loop for i from 1
 	 for name in cards-names
 	 for quantity in cards-quantities
-	 do (format t "~a. ~a (~a)~%" i name quantity)))
-    ))
+	 do (format t "~a. ~a (~a)~%" i name quantity)))))
+
+(defun get-deck-cards-names-and-quantities (name)
+  (let* ((deck (get-deck name))
+	 (deck-id (access deck :id))
+	 (cards (when deck-id (get-deck-cards name)))
+	 (cards-ids (loop for card in cards collect (access card :card-id)))
+	 (cards-quantities (loop for card in cards collect (access card :quantity)))
+	 (cards-names (when cards-ids
+			(loop for id in cards-ids collect (get-card-name-by-id id)))))
+    (when (and deck-id cards-names cards-quantities)
+      (loop
+	 for name in cards-names
+	 for quantity in cards-quantities
+	 collect `((:name . ,name)
+		   (:quantity . ,quantity))))))
+;; (get-deck-cards-names-and-quantities "Ashiok")
+
+;; (get-deck-cards "Ashiok")
 
 (defun get-deck-card-names (name)
   (let* ((deck (get-deck name))
@@ -328,69 +366,49 @@
 ;; (get-deck-card-names "Ashiok")
 
 (defun get-collection-size ()
-  (car (access (with-postgres-connection
-		   (retrieve-all (select (fields (:sum :quantity))
-				   (from :collection))))
-	       :sum)))
+  (access (conn (query (:select (:sum 'quantity) :from 'collection) :alist)) :sum))
 
 ;; (get-collection-size)
 ;; (get-collection-uniques-size)
 
 (defun get-collection-uniques-size ()
-  (with-postgres-connection
-      (length (retrieve-all (select :quantity
-			      (from :collection))))))
+  (access (conn (query (:select (:count 'quantity) :from 'collection) :alist)) :count))
 
 (defun get-collection-card-names ()
-  (loop for card in (with-postgres-connection
-			(retrieve-all (select :name (from :cards)
-					      (where (:in :id (select :id
-								(from :collection)))))))
-     collect (access card :name)))
+  (loop for card in (conn (query (:select 'name :from 'cards :where (:in 'id (:select 'id :from 'collection)))))
+     collect (car card)))
 ;; (get-collection-card-names)
 
 (defun describe-collection ()
-  (let ((cards (with-postgres-connection
-		   (retrieve-all (select :*
-				   (from :collection))))))
-	 
-    (loop for card in cards
+  (let ((cards (conn (query (:select '* :from 'collection) :alists))))
+    (loop for card in (reverse cards)
        do (format t "Name: ~35a ~t Quantity: ~4a ~t Used: ~a~%"
 		  (get-card-name-by-id (access card :id))
 		  (access card :quantity)
 		  (access card :used)))))
+;; (describe-collection)
 
 (defun describe-unused-collection ()
-  (let ((cards (with-postgres-connection
-		   (retrieve-all (select :*
-				   (from :collection)
-				   (where (:= :used 0)))))))
-	 
-    (loop for card in cards
+  (let ((cards (conn (query (:select '* :from 'collection :where (:= 'used 0)) :alists))))
+    (loop for card in (reverse cards)
        do (format t "Name: ~35a ~t Quantity: ~4a ~t Used: ~a~%"
 		  (get-card-name-by-id (access card :id))
 		  (access card :quantity)
 		  (access card :used)))))
 ;; (describe-unused-collection)
 
-(defun get-quantity-unused-collection ()
-  (let ((cards (with-postgres-connection
-		   (retrieve-all (select :*
-				   (from :collection)
-				   (where (:= :used 0)))))))
-	 
+(defun get-quantity-unused-collection ()  
+  (let ((cards (conn (query (:select '* :from 'collection :where (:= 'used 0)) :alists))))
     (length cards)))
 ;; (get-quantity-unused-collection)
 
 (defun get-deck-size (name)
   (loop for card in (get-deck-cards name) sum (access card :quantity)))
+;; (get-deck-size "Ashiok")
 
 (defun get-deck-cards (name)
   (let* ((deck (get-deck name)))
-    (with-postgres-connection
-	(retrieve-all (select :*
-			(from :collection-decks)
-			(where (:= :deck-id (access deck :id))))))))
+    (conn (query (:select '* :from 'collection-decks :where (:= 'deck-id (access deck :id))) :alists))))
 ;; (get-deck-cards "Ashiok")
 
 (defun store-card-image (name &optional (resolution :normal))
@@ -465,6 +483,16 @@
 ;;   (add-card-to-deck name "Ashiok")
 ;;   (describe-collection))
 
+;; (add-card-to-deck "Rimrock Knight // Boulder Rush" "Knight")
+;; (add-card-to-deck "Raging Redcap" "Knight")
+;; (add-card-to-deck "Ardenvale Tactician // Dizzying Swoop" "Knight")
+;; (add-card-to-deck "Ardenvale Paladin" "Knight")
+;; (add-card-to-deck "Venerable Knight" "Knight")
+;; (add-card-to-deck "Syr Alin, the Lion's Claw" "Knight")
+;; (add-card-to-deck "Jousting Dummy" "Knight")
+;; (add-card-to-deck "Burning-Yard Trainer" "Knight")
+
+;; (create-deck "Knight")
 ;; (create-deck "Ashiok")
 ;; (describe-deck "Ashiok")
 ;; (get-deck "Ashiok")
@@ -475,19 +503,59 @@
 ;; (add-card-to-collection "Sunlit Hoplite")
 ;; (describe-deck "Elspeth")
 
-;; (let ((name "Forest"))
-;;   ;; (add-card-to-collection name)
-;;   (add-card-to-deck name "Adventure")
-;;   (describe-deck "Adventure")
-;;   ;; (describe-unused-collection)
+;; (let ((name "Eidolon of Philosophy"))
+;;   (add-card-to-collection name)
+;;   ;; (add-card-to-deck name "Adventure")
+;;   ;; (describe-deck "Adventure")
+;;   (describe-collection)
 ;;   )
 
 ;; (describe-unused-collection)
 ;; (describe-collection)
 ;; (get-quantity-card-on-collection "Hypnotic Sprite")
 ;; (get-used-card-on-collection "Hypnotic Sprite")
-;; (get-card "Merchant of the Vale")
+;; (json:decode-json-from-string (get-card "Arcanist's Owl"))
+;; (json:decode-json-from-string (get-card "Shock"))
+;; (json:decode-json-from-string (get-card "Bastion of Remembrance"))
+;; (json:decode-json-from-string (get-card "Spire Mangler"))
 ;; (get-db-card-by-name "Hypnotic Sprite")
+
+(defun extract-metadata-from-json ()
+  (loop for card in (conn (query (:select '* :from 'cards) :alists))
+     do (let* ((id (access card :id))
+	       (c (json:decode-json-from-string (access card :json)))
+	       (oracle-text (access c :oracle--text))
+	       (power (access c :power))
+	       (toughness (access c :toughness))
+	       (colors (apply #'vector (access c :colors)))
+	       (cmc (access c :cmc))
+	       (type-line (access c :type--line))
+	       (keywords (apply #'vector (access c :keywords)))
+	       (set (access c :set))
+	       (set-name (access c :set-name))
+	       (rarity (access c :rarity))
+	       (flavor-text (access c :flavor--text))
+	       (price (let ((price (accesses c :prices :usd))) (if price (read-from-string price) 0.0))))
+	  (conn (query (:update 'cards :set
+				'oracle-text oracle-text
+				'power power
+				'toughness toughness
+				'colors colors
+				'cmc cmc
+				'type-line type-line
+				'keywords keywords
+				'set set
+				'set-name set-name
+				'rarity rarity
+				'flavor-text flavor-text
+				'price price
+				:where (:= 'id id)))
+		;; (query (:update 'cards :set 'power power :where (:= 'id id)))
+		)
+	  )))
+;; (conn (query (:alter-table 'cards :add-column 'flavor-text :type (or db-null string))))
+;; (conn (query (:alter-table 'cards :add-column 'price :type (or db-null float))))
+;; (conn (query (:alter-table 'cards :add-column 'keywords :type (or db-null text[]))))
 
 ;; (deck-has-card? "Ashiok's Forerunner" "Ashiok")
 
@@ -500,11 +568,9 @@
 ;; (add-card-to-collection "Sleep of the Dead")
 
 (defun init-to-deck (card-name deck-name)
-  (let ((name "Omen of the Dead")
-	(deck-name "Ashiok"))
-    (add-card-to-collection card-name)
-    (add-card-to-deck card-name deck-name)
-    (get-quantity-card-on-collection card-name)))
+  (add-card-to-collection card-name)
+  (add-card-to-deck card-name deck-name)
+  (get-quantity-card-on-collection card-name))
 
 ;; (get-quantity-card-on-collection "Glimpse of Freedom")
 
@@ -519,11 +585,7 @@
 (defun get-card-from-collection (name)
   (let* ((card (json:decode-json-from-string (get-card name)))
 	 (id (access card :id)))
-    (with-postgres-connection
-	(retrieve-one (select :*
-			(from :collection)
-			(where (:= :id id))
-			)))))
+    (conn (query (:select '* :from 'collection :where (:= 'id id)) :alist))))
 
 ;; (defparameter *coco* (dex:get (scryfall-uri "/cards/named" `(("exact" . "Shock")))))
 
@@ -574,7 +636,7 @@
       (dolist (row strtable)
 	(apply #'format stream row-fmt (mapcan #'list widths row))))))
 
-(let ((library (get-shuffled-deck-cards "Adventure"))
+(let ((library (get-shuffled-deck-cards "Elspeth"))
       (hand)
       (graveyard)
       (exiled)
@@ -680,14 +742,20 @@
   ;; (defun scry (count)
   ;;   (subseq library 0 count))
 
-  (defun drop-token (name &optional (tapped nil) (left-counter 0) (right-counter 0))
-    (let ((power-toughness (get-card-power-toughness name)))
-      (push `(,name
-	      ,(if tapped '"Tapped" "Untapped")
-	      ,(+ left-counter (first power-toughness))
-	      ,(+ right-counter (second power-toughness))
-	      (""))
-	    creatures))
+  (defun drop-token (name &key (tapped nil) (left-counter 0) (right-counter 0) (is-artifact? nil))
+    (add-to-log (format nil "Summon [[~a]]." name))
+    (if is-artifact?
+	(push `(,name
+		,(if tapped '"Tapped" "Untapped")
+		,left-counter)
+	      artifacts)
+	(let ((power-toughness (get-card-power-toughness name)))
+	  (push `(,name
+		  ,(if tapped '"Tapped" "Untapped")
+		  ,(+ left-counter (first power-toughness))
+		  ,(+ right-counter (second power-toughness))
+		  (""))
+		creatures)))
     (print-board))
 
   ;; (defun untap-all ())
@@ -799,8 +867,8 @@
 	   (let ((power-toughness (get-card-power-toughness found)))
 	     (push `(,found
 		     ,(if tapped '"Tapped" "Untapped")
-		     ,(+ left-counter (first power-toughness))
-		     ,(+ right-counter (second power-toughness))
+		     ,(if (numberp (first power-toughness)) (+ left-counter (first power-toughness)) "*")
+		     ,(if (numberp (second power-toughness)) (+ right-counter (second power-toughness)) "*")
 		     (""))
 		   creatures)))
 	  ((eq place :artifacts)
@@ -924,11 +992,13 @@
   (draw-cards-to-hand 7)
   )
 
-;; (save-game "Ashiok.mtg")
-;; (load-game "Ashiok.mtg")
+;; (save-game "Elspeth.mtg")
+;; (load-game "Elspeth.mtg")
 
 ;; (drop-token "Goat")
 ;; (drop-token "Sunder Shaman")
+;; (drop-token "Spider")
+;; (drop-token "Food" :is-artifact? t)
 
 ;; (get-card-mana-cost "Sleep of the Dead")
 ;; (get-card-mana-cost "Mire's Grasp")
@@ -942,7 +1012,7 @@
 ;; (get-card-mana-cost "Glimpse of Freedom")
 ;; (print-board)
 
-;; (destroy-card 1 :creatures)
+;; (destroy-card 2 :creatures)
 ;; (destroy-card 1 :artifacts)
 ;; (destroy-card 1 :planeswalkers)
 ;; (return-card 1 :hand)
@@ -950,13 +1020,39 @@
 ;; (advance-turn)
 ;; (untap-all)
 ;; (draw-cards-to-hand 1)
-;; (add-life -4)
-;; (add-life 1)
+;; (add-life -8)
+;; (add-life 2)
 ;; (unsummon-card 1 :graveyard)
 ;; (unsummon-card 1 :creatures)
 
+;; (tap-card 1 :lands)
+;; (tap-card 2 :lands)
+;; (tap-card 3 :lands)
+;; (tap-card 4 :lands)
 ;; (tap-card 5 :lands)
 ;; (tap-card 6 :lands)
+
+;; (drop-card-from-hand "Plains" :lands :count 1 :tapped nil)
+;; (drop-card-from-hand "Hero of the Pride" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Sunlit Hoplite" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Eidolon of Inspiration" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Daxos, Blessed by the Sun" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Pious Wayfarer" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Banishing Light" :artifacts :count 1 :tapped nil)
+;; (drop-card-from-hand "Karametra's Blessing" :graveyard :count 1 :tapped nil)
+
+;; (drop-card-from-hand "Forest" :lands :count 1 :tapped nil)
+;; (drop-card-from-hand "Wolfwillow Haven" :lands :count 1 :tapped nil)
+;; (drop-card-from-hand "Flaxen Intruder // Welcome Home" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Nylea's Huntmaster" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Arasta of the Endless Web" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Ilysian Caryatid" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Moss Viper" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Altar of the Pantheon" :artifacts :count 1 :tapped nil)
+;; (drop-card-from-hand "Icon of Ancestry" :artifacts :count 1 :tapped nil)
+;; (drop-card-from-hand "Return to Nature" :graveyard :count 1 :tapped nil)
+;; (drop-card-from-hand "Nylea's Forerunner" :exiled :count 1 :tapped nil)
+;; (drop-card-from-hand "Vivien, Champion of the Wilds" :planeswalkers :count 1 :tapped nil)
 
 ;; (drop-card-from-hand "Dismal Backwater" :lands :count 1 :tapped t)
 ;; (drop-card-from-hand "Swamp" :lands :count 1 :tapped nil)
@@ -973,10 +1069,11 @@
 ;; (drop-card-from-hand "Glimpse of Freedom" :graveyard :count 1 :tapped nil)
 ;; (drop-card-from-hand "Ashiok, Sculptor of Fears" :planeswalkers :count 1 :tapped nil)
 ;; (drop-card-from-hand "Ashiok's Forerunner" :creatures :count 1 :tapped nil)
-;; (add-counters 1 :place :creatures :left-counter 3 :right-counter 0)
+;; (add-counters 1 :place :creatures :left-counter 0 :right-counter -1)
 ;; (add-counters 1 :place :planeswalkers :left-counter -5 :right-counter 0)
 
-;; (exile-card 4 :graveyard)
+;; (exile-card 2 :hand)
+;; (tap-card 1 :lands)
 ;; (tap-card 1 :creatures)
 ;; (tap-card 2 :artifacts)
 ;; (untap-card 2 :lands)

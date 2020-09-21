@@ -1,0 +1,16 @@
+#deck {
+
+}
+
+#deck .card {
+    width: 200px;
+    float: left;
+}
+
+#deck .card img {
+    width: 200px;
+}
+
+#deck .card .quantity {
+    font-size: 15pt;
+}

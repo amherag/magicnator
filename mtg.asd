@@ -19,11 +19,12 @@
                "djula"
 
                ;; for DB
-               "datafly"
-               "sxql"
+	       "postmodern"
+	       "datafly"
 
 	       ;; utilities
 	       "alexandria"
+	       "cl-ppcre"
 	       "cl-json"
 	       "uuid"
 	       "marshal"

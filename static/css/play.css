@@ -18,33 +18,53 @@ body {
 #planeswalkers-table {
     background-color: #84ff31;
 }
+#graveyard-table {
+    background-color: #34cf78;
+}
+#exiled-table {
+    background-color: #381cd9;
+}
 
 /* Positioning */
-#hand-table {
+#graveyard-table {
     position: absolute;
     bottom: 0;
 }
+#exiled-table {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+}
+#hand-table {
+    position: absolute;
+    bottom: 100px;
+}
 #lands-table {
     position: absolute;
-    bottom: 200px;
+    bottom: 300px;
 }
 #artifacts-table {
     position: absolute;
-    bottom: 200px;
+    bottom: 300px;
     left: 50%;
 }
 #creatures-table {
     position: absolute;
-    bottom: 400px;
+    bottom: 500px;
 }
 #planeswalkers-table {
     position: absolute;
-    bottom: 400px;
+    bottom: 500px;
     left: 80%;
 }
 #hand-table, #lands-table, #creatures-table, #artifacts-table, #planeswalkers-table {
     height: 200px;
     width: 100%;
+    display: table;
+}
+#graveyard-table, #exiled-table {
+    height: 100px;
+    width: 50%;
     display: table;
 }
 #creatures-table {
@@ -59,7 +79,7 @@ body {
 #artifacts-table {
     width: 50%;
 }
-#hand-outer-cell, #lands-outer-cell, #creatures-outer-cell, #artifacts-outer-cell, #planeswalkers-outer-cell {
+#hand-outer-cell, #lands-outer-cell, #creatures-outer-cell, #artifacts-outer-cell, #planeswalkers-outer-cell, #graveyard-outer-cell, #exiled-outer-cell {
     position: relative;
     width: 100%;
     height: 100%;
@@ -73,7 +93,13 @@ body {
     vertical-align: middle;
     display: inline-block;
     text-align: center;
-    background-color: #999;
+}
+#graveyard-block, #exiled-block {
+    min-width: 100px;
+    height: 100px;
+    vertical-align: middle;
+    display: inline-block;
+    text-align: center;
 }
 .card {
     vertical-align: middle;
@@ -85,9 +111,22 @@ body {
     max-width: 100%;
     max-height: 150px;
 }
+#graveyard-block .card img {
+    max-width: 100%;
+    max-height: 70px;
+}
+#exiled-block .card img {
+    max-width: 100%;
+    max-height: 70px;
+}
 
 .flip {
     transform: rotate(45deg);
+}
+
+#card-viewer {
+    position: absolute;
+    left: 0;
 }
 
 /* .go-under, .go-over {
@@ -107,5 +146,5 @@ body {
 
 .go-over img {
     position: relative;
-    z-index: 3
+    z-index: 3;
 }

@@ -17,9 +17,8 @@
 
     <div id="hand-table">
 	<div id="hand-outer-cell">
-	    <div class="description">HAND</div>
 	    <div id="hand-block">
-		{% for card in hand %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="clickCard(event)" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+		{% for card in hand %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="clickCard(event)" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
 	    </div>
 	</div>
     </div>
@@ -27,7 +26,7 @@
     <div id="lands-table">
 	<div id="lands-outer-cell">
 	    <div id="lands-block">
-		{% for card in lands %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+		{% for card in lands %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
 	    </div>
 	</div>
     </div>
@@ -35,7 +34,7 @@
     <div id="creatures-table">
 	<div id="creatures-outer-cell">
 	    <div id="creatures-block">
-		{% for card in creatures %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+		{% for card in creatures %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
 	    </div>
 	</div>
     </div>
@@ -43,7 +42,7 @@
     <div id="artifacts-table">
 	<div id="artifacts-outer-cell">
 	    <div id="artifacts-block">
-		{% for card in artifacts %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+		{% for card in artifacts %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
 	    </div>
 	</div>
     </div>
@@ -51,18 +50,26 @@
     <div id="planeswalkers-table">
 	<div id="planeswalkers-outer-cell">
 	    <div id="planeswalkers-block">
-		{% for card in planeswalkers %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.png }}" alt="{{ card.name }}" /></div>{% endfor %}
+		{% for card in planeswalkers %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
 	    </div>
 	</div>
     </div>
 
-    {% for card in graveyard %}
-    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
-    {% endfor %}
+    <div id="graveyard-table">
+	<div id="graveyard-outer-cell">
+	    <div id="graveyard-block">
+		{% for card in graveyard %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
 
-    {% for card in exiled %}
-    <img src="{{ card.image.png }}" alt="{{ card.name }}" />
-    {% endfor %}
+    <div id="exiled-table">
+	<div id="exiled-outer-cell">
+	    <div id="exiled-block">
+		{% for card in exiled %}<div class="card"><img onmouseout="viewCard(null)" onmouseover="viewCard(this)" onmouseup="$(this).toggleClass('flip')" src="{{ card.image.normal }}" alt="{{ card.name }}" /></div>{% endfor %}
+	    </div>
+	</div>
+    </div>
 
     <div id="card-viewer">
     </div>
