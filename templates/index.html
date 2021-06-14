@@ -1,7 +1,102 @@
 {% extends "layouts/default.html" %}
 {% block title %}MTG{% endblock %}
 {% block content %}
-<div id="main">
-  Welcome to <a href="http://8arrow.org/caveman/">MTG</a>!
-</div>
-{% endblock %}
+<div class="container-fluid">
+    <div class="row">
+	<div class="col-12">
+	    <hr class="my-4" />
+	</div>
+    </div>
+    <div class="row">
+	<div class="menu col-2">
+	    <div class="nav flex-column nav-pills" id="menu" role="tablist" aria-orientation="vertical">
+		
+		<a class="nav-link active"
+		   id="v-pills-collection-tab"
+		   data-toggle="pill"
+		   href="#v-pills-collection"
+		   role="tab"
+		   aria-controls="v-pills-collection"
+		   aria-selected="true">Collection</a>
+		<a class="nav-link"
+		   id="v-pills-decks-tab"
+		   data-toggle="pill"
+		   href="#v-pills-decks"
+		   role="tab"
+		   aria-controls="v-pills-decks"
+		   aria-selected="false">Decks</a>
+	    </div>
+	</div>
+	<div class="col-10 tab-content" id="v-pills-tabContent">
+	    <div class="row">
+		<div class="col-2" id="submenu">
+		</div>
+		<div class="col-10" id="content">
+		</div>
+	    </div>
+	</div>
+    </div>
+    {% endblock %}
+    {% block body-scripts %}
+    <script>
+     $('#menu.nav-pills a').on('shown.bs.tab', function() {
+	 var active = $('#menu .active').attr('aria-controls');
+
+	 if (active == 'v-pills-decks') {
+	     $.ajax({
+		 url: '/get-decks',
+		 method: "GET",
+		 dataType: "json",
+		 beforeSend: () => {
+		 },
+		 complete: () => {
+		 },
+		 success: (data) => {
+		     var div = $("<div>")
+		     div.attr("class", "menu nav nav-pills flex-column");
+		     div.attr("id", "decks-menu");
+		     div.attr("role", "tablist");
+		     div.attr("aria-orientation", "vertical");
+
+		     var i = 0;
+		     data.forEach((deck) => {
+			 var a = $("<a>");
+			 a.attr("class", "nav-link")
+			 a.attr("id", "v-pills-deck-" + deck.name + "-tab")
+			 a.attr("data-toggle", "pill")
+			 a.attr("href", "#v-pills-deck-" + deck.name)
+			 a.attr("role", "tab")
+			 a.attr("aria-controls", "v-pills-deck")
+			 a.attr("aria-selected", "false")
+			 a.text(deck.name)
+
+			 div.append(a);
+			 $('#submenu').html(div);
+			 i++;
+		     });
+		 },
+		 error: (req, status, err) => {
+		     console.log(req)
+		     console.log(status)
+		 }
+	     });
+	 }
+	 
+	 if (active == 'v-pills-collection') {
+	     
+	 }
+	 
+     });
+
+
+
+
+     $('#decks-menu .nav-link').on('click', function() {
+	 console.log("meow")
+	 /* var active = $('#decks-menu .active').attr('aria-controls');
+
+	    console.log(active) */
+	 
+     });
+    </script>
+    {% endblock %}

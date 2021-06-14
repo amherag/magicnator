@@ -1,3 +1,4 @@
+(ql-dist:disable (ql-dist:find-dist "ultralisp"))
 ;; (ql:quickload :mtg)
 ;; (mtg:start :port 2001)
 (in-package :cl-user)
@@ -9,6 +10,8 @@
    :get-collection
    :get-deck-cards-names-and-quantities
    :get-cards-image-pathspec
+
+   :get-decks
    
    :get-hand
    :get-graveyard
@@ -20,6 +23,8 @@
    :get-life
    :get-log))
 (in-package :mtg.controller)
+
+(defmacro comment (&rest body))
 
 (defun scryfall-uri (endpoint args)
   (let ((args (format nil "~{~a~^&~}"(loop for arg in args collect (format nil "~a=~a" (car arg) (cdr arg))))))
@@ -144,29 +149,26 @@
 ;; (get-cards-with-type-from-collection "Knight")
 
 
-(defun get-collection (&key keywords type (all-or-any? :any))
-  (let ((keywords (if (listp keywords) (apply #'vector keywords) keywords)))
-    (conn (query (:select '* :from 'cards
-			  :where
-			  (:and (:or
-				 (:like 'type-line (format nil "%~a%" type))
-				 ;; (:@> 'keywords (:array[] keywords))
-				 (:&& 'keywords (:array[] keywords))) ;; can have any
-				(:in 'id (:set (get-collection-card-ids))))) :alists))))
-
-(defun get-collection (&key keywords type (all-or-any? :any))
-  (let ((keywords (if (listp keywords) (apply #'vector keywords) keywords)))
-    (conn (query (:select '* (:as (:- 'collection.quantity 'collection.used) :quantity) :from 'cards
+(defun get-collection (&key (name "") text keywords type colors)
+  (let* ((keywords (if (listp keywords) (apply #'vector keywords) keywords))
+	 ;; (colors (if colors colors '("W" "B" "U" "R" "G")))
+	 (colors (if (and colors (listp colors)) (apply #'vector colors) colors)))
+    (conn (query (:select '* (:as (:- 'collection.quantity 'collection.used) :free)
+			  :from 'cards
 			  :inner-join 'collection
 			  :on (:= 'cards.id 'collection.id)
 			  :where
 			  (:or
-			   (:like 'type-line (format nil "%~a%" type))
+			   (:= (:cardinality 'colors) (if colors 0 99999))
+			   (:&& 'colors (:array[] (:array[] (if colors colors #("ZZZ")))))
+			   (:like 'cards.name (if name (format nil "%~a%" (string-upcase name)) "zzzzzz"))
+			   (:like 'oracle-text (if text (format nil "%~a%" text) "zzzzzz"))
+			   (:like 'type-line (if type (format nil "%~a%" type) "zzzzzzzzz"))
 			   ;; (:@> 'keywords (:array[] keywords))
-			   (:&& 'keywords (:array[] keywords))) ;; can have any
+			   (:@> 'keywords (:array[] keywords)))	;; can have any
 			  ) :alists))))
 
-;; (get-collection '("Flash") "Knight")
+;; (get-collection :keywords '("Flash") :type "Knight")
 ;; (get-collection nil "Knight")
 
 ;; (get-collection)
@@ -200,6 +202,8 @@
 
 (defun get-used-card-on-collection (name)
   (access (get-card-from-collection name) :used))
+
+;; (add-card-to-collection "Shock")
 
 ;; (add-card-to-collection "Shock")
 ;; (get-used-card-on-collection "Shock")
@@ -273,14 +277,38 @@
 (defun list-decks ()
   (loop for i from 1
      for deck in (conn (query (:select 'name :from 'decks) :alists))
-     do (format t "~a. ~a~%" i (access deck :name))))
+	do (format t "~a. ~a~%" i (access deck :name))))
+
+(defun get-decks ()
+  (conn (query (:select '* :from 'decks) :alists)))
+;; (get-decks)
+
+(comment
+ (progn
+   (list-decks)
+   (format t "~%")
+   (describe-deck "ashiok")
+   (format t "~%")
+   (describe-deck "elspeth")
+   (format t "~%")
+   (describe-deck "adventure")
+   (format t "~%")
+   (describe-deck "knight")
+   (format t "~%")
+   (describe-deck "amass")
+   (format t "~%")
+   (describe-deck "draw")
+   (format t "~%")
+   (describe-deck "simicflash")
+   (format t "~%")
+   (describe-deck "cycling")))
 
 ;; (list-decks)
 ;; (get-deck "Ashiok")
-;; (create-deck "Ashiok")
+;; (create-deck "SimicFlash")
 ;; (create-deck "Elspeth")
 ;; (remove-deck "Ashiok")
-;; (remove-deck "Elspeth")
+;; (remove-deck "Flash")
 
 (defun create-deck (name)
   (let ((name (string-upcase name)))
@@ -330,11 +358,11 @@
 	 (cards-names (when cards-ids
 			(loop for id in cards-ids collect (get-card-name-by-id id)))))
     (when (and deck-id cards-names cards-quantities)
-      (format t "Deck Name: ~a~%~%" name)
+      (format t "//Deck Name: ~a (~a)~%~%" name (reduce #'+ cards-quantities))
       (loop for i from 1
 	 for name in cards-names
 	 for quantity in cards-quantities
-	 do (format t "~a. ~a (~a)~%" i name quantity)))))
+	 do (format t "~a ~a~%" quantity name)))))
 
 (defun get-deck-cards-names-and-quantities (name)
   (let* ((deck (get-deck name))
@@ -491,24 +519,64 @@
 ;; (add-card-to-deck "Syr Alin, the Lion's Claw" "Knight")
 ;; (add-card-to-deck "Jousting Dummy" "Knight")
 ;; (add-card-to-deck "Burning-Yard Trainer" "Knight")
+;; (add-card-to-deck "Leonin of the Lost Pride" "Knight")
+;; (add-card-to-deck "Terror of Mount Velus" "Knight")
+;; (add-card-to-deck "Hero of the Winds" "Knight")
+;; (add-card-to-deck "Archon of Falling Stars" "Knight")
+;; (add-card-to-deck "Mysterious Pathlighter" "Knight")
+;; (add-card-to-deck "Lonesome Unicorn // Rider in Need" "Knight")
 
-;; (create-deck "Knight")
-;; (create-deck "Ashiok")
+;; (add-card-to-deck "Wind-Scarred Crag" "Knight")
+;; (add-card-to-deck "Mountain" "Knight")
+;; (add-card-to-deck "Plains" "Knight")
+;; (add-card-to-deck "Castle Ardenvale" "Knight")
+
+;; (remove-card-from-deck "Wings of Hubris" "Knight")
+;; (remove-card-from-deck "Final Flare" "Knight")
+;; (remove-card-from-deck "Leonin of the Lost Pride" "Elspeth")
+;; (add-card-to-deck "Nylea, Keen-Eyed" "Adventure")
+;; (add-card-to-deck "Trapped in the Tower" "Knight")
 ;; (describe-deck "Ashiok")
+;; (list-decks)
+;; (describe-collection)
+
+
+;; (add-card-to-deck "Thaumaturge's Familiar" "Knight")
+
+;; (create-deck "Draw")
+;; (create-deck "Ashiok")
+;; (describe-deck "Draw")
 ;; (get-deck "Ashiok")
 ;; (list-decks)
 
-;; (create-deck "Adventure")
-;; (add-card-to-deck "Indomitable Will" "Elspeth")
+;; (create-deck "Cycling")
+;; (add-card-to-deck "Hypnotic Sprite // Mesmeric Glare" "Draw")
 ;; (add-card-to-collection "Sunlit Hoplite")
-;; (describe-deck "Elspeth")
 
-;; (let ((name "Eidolon of Philosophy"))
-;;   (add-card-to-collection name)
-;;   ;; (add-card-to-deck name "Adventure")
-;;   ;; (describe-deck "Adventure")
-;;   (describe-collection)
-;;   )
+(comment
+ ;; (remove-card-from-deck "Thunderous Snapper" "Draw")
+ ;; (remove-card-from-collection "Startling Development")
+ ;; (list-decks)
+ 
+ (let ((deck-name "Cycling")
+       (name "Forest")
+       (n 7))
+   (loop repeat n do
+     (add-card-to-collection name)
+     ;; (add-card-to-deck name deck-name)
+     ;; (remove-card-from-deck name deck-name)
+     ;; (remove-card-from-collection name)
+	 )
+   
+   ;; (describe-deck deck-name)
+   ;; (describe-collection)
+   (format t "~%~%Added ~a ~a~%~%" n name)
+   )
+
+ ;; (describe-deck "Cycling")
+ )
+;; (remove-card-from-deck "Relentless Advance" "Amass")
+;; (describe-deck "Amass")
 
 ;; (describe-unused-collection)
 ;; (describe-collection)
@@ -517,6 +585,7 @@
 ;; (json:decode-json-from-string (get-card "Arcanist's Owl"))
 ;; (json:decode-json-from-string (get-card "Shock"))
 ;; (json:decode-json-from-string (get-card "Bastion of Remembrance"))
+;; (json:decode-json-from-string (get-card "Gingerbrute"))
 ;; (json:decode-json-from-string (get-card "Spire Mangler"))
 ;; (get-db-card-by-name "Hypnotic Sprite")
 
@@ -560,7 +629,6 @@
 ;; (deck-has-card? "Ashiok's Forerunner" "Ashiok")
 
 ;; (add-card-to-deck "Devourer of Memory" "Ashiok")
-;; (remove-card-from-deck "Ashiok's Forerunner" "Ashiok")
 ;; (get-used-card-on-collection "Ashiok's Forerunner")
 ;; (get-quantity-card-on-collection "Ashiok's Forerunner")
 ;; (add-card-to-collection "Ashiok's Forerunner")
@@ -636,7 +704,7 @@
       (dolist (row strtable)
 	(apply #'format stream row-fmt (mapcan #'list widths row))))))
 
-(let ((library (get-shuffled-deck-cards "Elspeth"))
+(let ((library (get-shuffled-deck-cards "Knight"))
       (hand)
       (graveyard)
       (exiled)
@@ -678,6 +746,8 @@
   (defun advance-turn ()
     (incf turn)
     (add-to-log (format nil "Turn ~a." turn))
+    (untap-all)
+    (draw-cards-to-hand 1)
     (print-board))
 
   (defun print-log ()
@@ -992,8 +1062,8 @@
   (draw-cards-to-hand 7)
   )
 
-;; (save-game "Elspeth.mtg")
-;; (load-game "Elspeth.mtg")
+;; (save-game "Knight.mtg")
+;; (load-game "Knight.mtg")
 
 ;; (drop-token "Goat")
 ;; (drop-token "Sunder Shaman")
@@ -1012,15 +1082,15 @@
 ;; (get-card-mana-cost "Glimpse of Freedom")
 ;; (print-board)
 
+;; (destroy-card 1 :lands)
 ;; (destroy-card 2 :creatures)
 ;; (destroy-card 1 :artifacts)
 ;; (destroy-card 1 :planeswalkers)
 ;; (return-card 1 :hand)
 
 ;; (advance-turn)
-;; (untap-all)
-;; (draw-cards-to-hand 1)
-;; (add-life -8)
+;; (print-board)
+;; (add-life -2)
 ;; (add-life 2)
 ;; (unsummon-card 1 :graveyard)
 ;; (unsummon-card 1 :creatures)
@@ -1031,6 +1101,15 @@
 ;; (tap-card 4 :lands)
 ;; (tap-card 5 :lands)
 ;; (tap-card 6 :lands)
+
+;; (drop-card-from-hand "Plains" :lands :count 1 :tapped nil)
+;; (drop-card-from-hand "Mountain" :lands :count 1 :tapped nil)
+;; (drop-card-from-hand "Venerable Knight" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Ardenvale Paladin" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Inspiring Veteran" :creatures :count 1 :tapped nil)
+;; (drop-card-from-hand "Bronze Sword" :artifacts :count 1 :tapped nil)
+;; (drop-card-from-hand "Fateful End" :graveyard :count 1 :tapped nil)
+;; (drop-card-from-hand "Scorching Dragonfire" :graveyard :count 1 :tapped nil)
 
 ;; (drop-card-from-hand "Plains" :lands :count 1 :tapped nil)
 ;; (drop-card-from-hand "Hero of the Pride" :creatures :count 1 :tapped nil)
@@ -1079,7 +1158,7 @@
 ;; (untap-card 2 :lands)
 
 ;; (draw-cards-to-hand 1)
-;; (mill-cards 2)
+;; (mill-cards 1)
 ;; (print-lands)
 ;; (print-hand)
 ;; (print-board)

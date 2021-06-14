@@ -45,6 +45,12 @@
 	 (card-quantities (if (and (listp (first cards)) (access (first cards) :quantity))
 			      (loop for card in cards collect (access card :quantity))
 			      (make-list (length cards) :initial-element 1)))
+	 (card-frees (if (and (listp (first cards)) (access (first cards) :free))
+			      (loop for card in cards collect (access card :free))
+			      (make-list (length cards) :initial-element -1)))
+	 ;; (card-quantities (if (and (listp (first cards)) (access (first cards) :quantity))
+	 ;; 		      (loop for card in cards collect (access card :quantity))
+	 ;; 		      (make-list (length cards) :initial-element 1)))
 	 (small-images (mtg.controller:get-cards-image-pathspec card-names :small))
 	 (normal-images (mtg.controller:get-cards-image-pathspec card-names :normal))
 	 (large-images (mtg.controller:get-cards-image-pathspec card-names :large))
@@ -55,8 +61,10 @@
        for large in large-images
        for png in png-images
        for quantity in card-quantities
+       for free in card-frees
        collect `((:name . ,name)
 		 (:quantity . ,quantity)
+		 (:free . ,free)
 		 (:image (:small . ,small)
 			 (:normal . ,normal)
 			 (:large . ,large)

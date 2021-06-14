@@ -34,11 +34,21 @@
 			  (:graveyard . ,(get-cards #'mtg.controller:get-graveyard))
 			  (:exiled . ,(get-cards #'mtg.controller:get-exiled)))))
 
-(defroute "/view-collection" (&key |keywords| |type| (|all-or-any| :any))
-  (render #P"view-collection.html" `((:collection . ,(get-cards (lambda () (mtg.controller:get-collection :keywords (cl-ppcre:split "," |keywords|) :type |type| :all-or-any? |all-or-any|)))))))
+(defroute "/view-collection" (&key |name| |colors| |text| |keywords| |type|)
+  (render #P"view-collection.html" `((:collection . ,(get-cards (lambda ()
+								  (mtg.controller:get-collection
+								   :name |name|
+								   :colors (cl-ppcre:split "," |colors|)
+								   :text |text|
+								   ;; :text (cl-ppcre:split "," |text|)
+								   :keywords (cl-ppcre:split "," |keywords|)
+								   :type |type|)))))))
 
 (defroute "/view-deck" (&key |name|)
   (render #P"view-deck.html" `((:deck . ,(get-cards (lambda () (mtg.controller:get-deck-cards-names-and-quantities |name|)))))))
+
+(defroute "/get-decks" ()
+  (render-json (mtg.controller:get-decks)))
 
 ;;
 ;; Error pages
