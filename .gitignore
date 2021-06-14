@@ -56,3 +56,6 @@ static/img/cards
 
 # Saved games
 saved-games/
+
+# Configuration file
+config.lisp

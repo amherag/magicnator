@@ -25,9 +25,9 @@
 (defparameter *scryfall-url* "https://api.scryfall.com")
 
 ;; For postgres.
-(defparameter *db-name* "mtg")
-(defparameter *db-user* "amherag")
-(defparameter *db-pass* "asafrade")
+(defparameter *db-name* "")
+(defparameter *db-user* "")
+(defparameter *db-pass* "")
 (defparameter *db-hostname* "localhost")
 
 (defmacro conn (&rest body)
